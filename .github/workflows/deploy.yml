@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Build and publish to buithehoa.github.io
 
 on:
   push:
@@ -9,15 +9,17 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: publish
   cancel-in-progress: true
 
+env:
+  TARGET_REPO: git@github.com:buithehoa/buithehoa.github.io.git
+  TARGET_BRANCH: master
+
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,17 +30,28 @@ jobs:
       - run: npm ci
       - run: npx nuxt build --preset github_pages
         env:
-          NUXT_APP_BASE_URL: /${{ github.event.repository.name }}/
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./.output/public
+          NUXT_APP_BASE_URL: /
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Configure deploy key
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.PAGES_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Push build to target repo
+        run: |
+          git clone --branch "$TARGET_BRANCH" "$TARGET_REPO" target
+          # Replace the site contents but keep the target's git history
+          find target -mindepth 1 -maxdepth 1 -name .git -prune -o -exec rm -rf {} +
+          cp -a .output/public/. target/
+          cd target
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+          else
+            git commit -m "Publish ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+            git push origin "$TARGET_BRANCH"
+          fi
