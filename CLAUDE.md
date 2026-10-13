@@ -20,9 +20,13 @@ Core interaction: a recruiter (or the user) can filter the project list by langu
   - Switched from SvelteKit to Nuxt because the user already uses Svelte on another project and wants variety here. Vue is also more commonly listed in job postings.
   - Rationale for Nuxt: file-based routing (`pages/`), prerendering of every route (including future per-project detail pages) without SPA-fallback workarounds, build-time data loading via `useAsyncData`, and reactive URL query state via `useRoute().query` + `router.replace`.
   - Known trade-off: Nuxt is bigger than this site needs (server/Nitro features go unused). The server layer is build-time only and does not ship to the browser; the client gets Vue + vue-router + Nuxt's small runtime.
-- **Hosting:** GitHub Pages.
-  - If not using a custom domain, set `NUXT_APP_BASE_URL=/<repository>/` for the build step (site is served from `https://<user>.github.io/<repository>/`).
-  - Deploy via GitHub Actions: `actions/upload-pages-artifact` (path `./.output/public`) + `actions/deploy-pages`. Job needs `pages: write` and `id-token: write` permissions. Node 20 recommended.
+- **Hosting:** GitHub Pages, served from the user site `https://buithehoa.github.io/` (root, no base path).
+  - This repo only builds the site; it does not use Pages itself (Pages is disabled here). `.github/workflows/deploy.yml` builds with `NUXT_APP_BASE_URL=/` and `--preset github_pages`, then pushes the contents of `.output/public` as a new commit to `master` of `buithehoa/buithehoa.github.io`, which serves that branch via legacy Pages. History in the target repo is kept; nothing is committed when the output is unchanged.
+  - Auth is a deploy key (write access on `buithehoa/buithehoa.github.io`), with the private half stored as the `PAGES_DEPLOY_KEY` secret in this repo. The default `GITHUB_TOKEN` can't push to another repo.
+  - The target branch is `master` (set via `TARGET_BRANCH` in the workflow); keep it that way unless the branch is renamed in both places.
+  - `hoa.is-a.dev` is the intended custom domain (the home page header). Not set up yet: it needs a `public/CNAME` file, a registration PR to `is-a-dev/register`, and the custom domain set in the Pages settings of `buithehoa.github.io`.
+  - Node 20 is used in the workflow.
+- **UI:** Nuxt UI (`@nuxt/ui`) on Tailwind CSS v4. CSS entry is `app/assets/css/main.css`; `app/app.vue` wraps the page in `<UApp>`.
 - **Data source:** GitHub public repos (via GitHub API, fetched at build time only).
 - **Scaffold:** `npx nuxi@latest init rage-against-the-resume` (Node.js 18+, even-numbered release recommended). Verify against the current Nuxt docs if the command fails.
 - **Naming:** repo and package name `rage-against-the-resume` (kebab-case).
